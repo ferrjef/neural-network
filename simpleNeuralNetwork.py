@@ -1,4 +1,5 @@
 import math
+import random
 
 class Neuron (object):
     def __init__(self, node_id, net_in):
@@ -33,6 +34,28 @@ class simpleNeuralNetwork (object):
 
     def backpropagation(self):
         pass
+
+    def train(self, trainset, epochs=10):
+        self.features = [row[:len(row)-1] for row in trainset]
+        self.labels = [row[-1] for row in trainset]
+        print("len feat: %d" % len(self.features))
+        print("len lbs: %d" % len(self.labels))
+        for e in range(1, epochs + 1):
+            # print("Epoch %d --------------------- " % e)
+            self.loss = 0
+            for r in range(len(trainset)):
+                if self.inputLayerSize == len(self.features[0]) and self.outputLayerSize == 1:
+                    for j in range(len(self.layers[0])):
+                        self.layers[0][j].in_w = self.features[r][j]
+
+                    self.forward()
+                    
+                    y = self.labels[r]
+                    yhat = self.layers[-1][0].out_w
+                    self.loss = 0.5 * math.pow( y - yhat, 2)
+                    # print("Target = %.5f, Prediction = %.5f, Loss = %.5f" % (y, yhat, self.loss))
+
+                    self.backpropagation()
 
     def activation(self, layer_id, value):
         if self.fun_activations[layer_id] == 'relu':
@@ -71,7 +94,7 @@ class simpleNeuralNetwork (object):
         for k in range(1, len(self.layers)):
             for j in range(len(self.layers[k])):
                 for i in range(len(self.layers[k - 1])):
-                    self.layers[k][j].weights.append(0)
+                    self.layers[k][j].weights.append( random.random()*0.5 )
 
     def track(self):
         print("Input  layer size: %d" % self.inputLayerSize)
@@ -87,4 +110,9 @@ class simpleNeuralNetwork (object):
 
 
 nn = simpleNeuralNetwork()
+nn.track()
+
+xorset = [[0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0]]
+nn.train(xorset)
+
 nn.track()
