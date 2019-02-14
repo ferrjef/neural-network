@@ -7,9 +7,11 @@ class Neuron (object):
         self.in_w = net_in
         self.out_w = self.in_w
         self.weights = []
+        self.loss = .0
+        self.target = None
 
 class simpleNeuralNetwork (object):
-    def __init__(self, input_size=2, hidden_layer_size=2, output_size=1, bias=0.05, lr=0.5, activations=['relu', 'sigmoid']):
+    def __init__(self, input_size=2, hidden_layer_size=2, output_size=2, bias=0.05, lr=0.5, activations=['relu', 'sigmoid']):
         self.inputLayerSize = input_size
         self.hiddenLayerSize = hidden_layer_size
         self.outputLayerSize = output_size
@@ -17,6 +19,7 @@ class simpleNeuralNetwork (object):
         self.bias = bias
         self.learning_rate = lr
         self.fun_activations = activations
+        self.total_loss = 0.0
 
         self.layers = []
         self.buildGraph()
@@ -33,29 +36,45 @@ class simpleNeuralNetwork (object):
                 self.layers[k][j].out_w = self.activation(k - 1, self.layers[k][j].in_w)
 
     def backpropagation(self):
-        pass
+
+        print("Total loss: %.3f" % self.total_loss)
+
+        for k in range(len(self.layers)-1,-1,-1):
+            for j in range(len(self.layers[k])):
+                if k == len(self.layers) - 1:
+                    for i in range(len(self.layers[k-1])):
+                        dLdOut = self.layers[k][j].out_w - self.layers[k][j].target
+                        dOutdIn = self.sigmoid(self.layers[k][j].out_w)*(1 - self.sigmoid(self.layers[k][j].out_w))
+                        dIndW = self.layers[k-1][i].out_w
+                        self.layers[k][j].weights[i] = dLdOut * dOutdIn * dIndW
+                else:
+                    pass
+                print("--> ", self.layers[k][j].weights)
+
+
+        
 
     def train(self, trainset, epochs=10):
-        self.features = [row[:len(row)-1] for row in trainset]
-        self.labels = [row[-1] for row in trainset]
-        print("len feat: %d" % len(self.features))
-        print("len lbs: %d" % len(self.labels))
+        self.features = [row[:len(trainset)-2] for row in trainset]
         for e in range(1, epochs + 1):
             # print("Epoch %d --------------------- " % e)
             self.loss = 0
             for r in range(len(trainset)):
-                if self.inputLayerSize == len(self.features[0]) and self.outputLayerSize == 1:
+                if self.inputLayerSize == len(self.features[0]):
                     for j in range(len(self.layers[0])):
                         self.layers[0][j].in_w = self.features[r][j]
-
                     self.forward()
-                    
-                    y = self.labels[r]
-                    yhat = self.layers[-1][0].out_w
-                    self.loss = 0.5 * math.pow( y - yhat, 2)
-                    # print("Target = %.5f, Prediction = %.5f, Loss = %.5f" % (y, yhat, self.loss))
 
-                    self.backpropagation()
+                y = trainset[r][-1]
+                for i in range(len(self.layers[-1])):
+                    yhat = self.layers[-1][i].out_w
+                    self.layers[-1][i].loss = 0.5 * math.pow( y - yhat , 2 )
+                    self.layers[-1][i].target = y
+                    self.total_loss += self.layers[-1][i].loss
+                    #print("y = %.3f, yhat = %.3f, loss = %.3f" % (y, yhat, self.layers[-1][i].loss))
+                
+                self.backpropagation()
+                self.total_loss = 0.0
 
     def activation(self, layer_id, value):
         if self.fun_activations[layer_id] == 'relu':
@@ -63,6 +82,13 @@ class simpleNeuralNetwork (object):
         if self.fun_activations[layer_id] == 'sigmoid':
             return self.sigmoid(value)
         return value
+
+    def derivate(self, layer_id, y, x):
+        if self.fun_activations[layer_id] == 'relu':
+            return 0 if x <= 0 else 1
+        if self.fun_activations[layer_id] == 'sigmoid':
+            return x - y
+        return 0
 
     def relu(self, x):
         return max(0, x)
@@ -109,10 +135,10 @@ class simpleNeuralNetwork (object):
                 print(" weights: ", node.weights)
 
 
+# sample
+
 nn = simpleNeuralNetwork()
 nn.track()
 
 xorset = [[0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0]]
-nn.train(xorset)
-
-nn.track()
+nn.train(xorset,1)
