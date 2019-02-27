@@ -1,144 +1,62 @@
 import math
-import random
+import numpy as np
 
-class Neuron (object):
-    def __init__(self, node_id, net_in):
-        self.id = node_id
-        self.in_w = net_in
-        self.out_w = self.in_w
-        self.weights = []
-        self.loss = .0
-        self.target = None
+np.random.seed(7)
 
-class simpleNeuralNetwork (object):
-    def __init__(self, input_size=2, hidden_layer_size=2, output_size=2, bias=0.05, lr=0.5, activations=['relu', 'sigmoid']):
-        self.inputLayerSize = input_size
-        self.hiddenLayerSize = hidden_layer_size
-        self.outputLayerSize = output_size
+class SimpleNeuronNetwork:
+    
+    ''' A simple neuron network implementation '''
+    
+    def __init__(self, input_size=2, hidden_layers_sizes=[3, 3], output_size=1):
+        self.layer_sizes = [input_size] + hidden_layers_sizes + [output_size]
+        self.W = self.random_initial_weights()
 
-        self.bias = bias
-        self.learning_rate = lr
-        self.fun_activations = activations
-        self.total_loss = 0.0
+    def random_initial_weights(self):
+        weights = []
+        for i in range(1, len(self.layer_sizes)):
+            weights.append(np.random.randn(self.layer_sizes[i-1], self.layer_sizes[i]))
+        return weights
+    
+    def forward(self, inputs):
+        self.inputs = inputs
+        self.Z = []
+        self.a = []
 
-        self.layers = []
-        self.buildGraph()
-
-        self.forward()
-
-    def forward(self):
-        for k in range(1, len(self.layers)):
-            for j in range(len(self.layers[k])):
-                for i in range(len(self.layers[k-1])):
-                    W = self.layers[k][j].weights[i] * self.layers[k-1][i].out_w
-                    self.layers[k][j].in_w += W
-                self.layers[k][j].in_w += self.bias
-                self.layers[k][j].out_w = self.activation(k - 1, self.layers[k][j].in_w)
-
-    def backpropagation(self):
-
-        print("Total loss: %.3f" % self.total_loss)
-
-        for k in range(len(self.layers)-1,-1,-1):
-            for j in range(len(self.layers[k])):
-                if k == len(self.layers) - 1:
-                    for i in range(len(self.layers[k-1])):
-                        dLdOut = self.layers[k][j].out_w - self.layers[k][j].target
-                        dOutdIn = self.sigmoid(self.layers[k][j].out_w)*(1 - self.sigmoid(self.layers[k][j].out_w))
-                        dIndW = self.layers[k-1][i].out_w
-                        self.layers[k][j].weights[i] = dLdOut * dOutdIn * dIndW
-                else:
-                    pass
-                print("--> ", self.layers[k][j].weights)
-
-
+        self.Z.append(np.dot(self.inputs, self.W[0]))
+        self.a.append(self.activation(self.Z[0]))
+        for i in range(1, len(self.W)):
+            self.Z.append(np.dot(self.a[i-1], self.W[i]))
+            self.a.append(self.activation(self.Z[i]))
         
-
-    def train(self, trainset, epochs=10):
-        self.features = [row[:len(trainset)-2] for row in trainset]
-        for e in range(1, epochs + 1):
-            # print("Epoch %d --------------------- " % e)
-            self.loss = 0
-            for r in range(len(trainset)):
-                if self.inputLayerSize == len(self.features[0]):
-                    for j in range(len(self.layers[0])):
-                        self.layers[0][j].in_w = self.features[r][j]
-                    self.forward()
-
-                y = trainset[r][-1]
-                for i in range(len(self.layers[-1])):
-                    yhat = self.layers[-1][i].out_w
-                    self.layers[-1][i].loss = 0.5 * math.pow( y - yhat , 2 )
-                    self.layers[-1][i].target = y
-                    self.total_loss += self.layers[-1][i].loss
-                    #print("y = %.3f, yhat = %.3f, loss = %.3f" % (y, yhat, self.layers[-1][i].loss))
-                
-                self.backpropagation()
-                self.total_loss = 0.0
-
-    def activation(self, layer_id, value):
-        if self.fun_activations[layer_id] == 'relu':
-            return self.relu(value)
-        if self.fun_activations[layer_id] == 'sigmoid':
-            return self.sigmoid(value)
-        return value
-
-    def derivate(self, layer_id, y, x):
-        if self.fun_activations[layer_id] == 'relu':
-            return 0 if x <= 0 else 1
-        if self.fun_activations[layer_id] == 'sigmoid':
-            return x - y
-        return 0
-
-    def relu(self, x):
-        return max(0, x)
-
-    def sigmoid(self, x):
-        return 1 / (1 + math.exp(-x))
-
-    def buildGraph(self):
-        node_index = 1
-        input_layer = []
-        for i in range(self.inputLayerSize):
-            input_layer.append(Neuron(node_index, 0))
-            node_index += 1
+        return self.a[-1] # prediction (e.g yhat)
+    
+    def activation(self, z, fn="sigmoid"):
+        if fn == "sigmoid":
+            return 1 / (1 + np.exp(-z))
+        elif fn == "softmax":
+            return max(0, z)
+        return z
+    
+    def derivate(self, z, fn="sigmoid"):
+        if fn == "sigmoid":
+            return np.exp(-z) / ((1 + np.exp(-z))**2)
+        elif fn == "softmax":
+            return 0 if z <= 0 else 1
+        return z
+    
+    def backpropagation(self, y):
+        self.yhat = self.forward(self.inputs)
+        self.deltas = []
+        self.J = []
+    
+        self.deltas.append( np.multiply(self.yhat - y, self.derivate(self.Z[-1])) )
+        self.J.append( np.dot(self.a[0].T, self.deltas[0]) )
+    
+        self.deltas.append( np.dot(self.deltas[-1], self.W[-1].T) * self.derivate(self.Z[0]) )
+        self.J.append( np.dot(self.inputs.T, self.deltas[-1]) )
         
-        hidden_layer = []
-        for i in range(self.hiddenLayerSize):
-            hidden_layer.append(Neuron(node_index, 0))
-            node_index += 1
-        
-        output_layer = []
-        for i in range(self.outputLayerSize):
-            output_layer.append(Neuron(node_index, 0))
-            node_index += 1
-        
-        self.layers.append(input_layer)
-        self.layers.append(hidden_layer)
-        self.layers.append(output_layer)
-
-        for k in range(1, len(self.layers)):
-            for j in range(len(self.layers[k])):
-                for i in range(len(self.layers[k - 1])):
-                    self.layers[k][j].weights.append( random.random()*0.5 )
-
-    def track(self):
-        print("Input  layer size: %d" % self.inputLayerSize)
-        print("Hidden layer size: %d" % self.hiddenLayerSize)
-        print("Output layer size: %d" % self.outputLayerSize)
-        print("Overall bias: %.3f" % self.bias)
-        for k in range(len(self.layers)):
-            print("\n----- layer %d --------------------------" % k)
-            for j in range(len(self.layers[k])):
-                node = self.layers[k][j]
-                print("\n Neuron_%d, in: %.3f, out: %.3f," % (node.id, node.in_w, node.out_w))
-                print(" weights: ", node.weights)
-
-
-# sample
-
-nn = simpleNeuralNetwork()
-nn.track()
-
-xorset = [[0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0]]
-nn.train(xorset,1)
+        return self.J
+    
+    def loss(self, y):
+        yhat = self.a[-1]
+        return 0.5 * sum((y - yhat)**2)
